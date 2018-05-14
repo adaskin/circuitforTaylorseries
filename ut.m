@@ -4,14 +4,14 @@
 t = 1/10;
 fid = 1; %debug file
 threshold = 0.000001;% error threshold
-H = rand(16);
+H = rand(4);
 N = size(H,1);
 if (N ~= size(H,2))
     error('H must be square');
 end
 n = log2(N);
-k = n-1; % at kth step of the recursion we have 2x2 matrices
-K = 2^k;
+l = n-1; %number of extra qubits
+L = 2^l; % number of Vs forming H
 % % % % % % % % % %
 I = eye(2);
 In = eye(N);
@@ -20,14 +20,14 @@ warning('Hadamard gate is not normalized');
 Hadamard = [1 1; 1 -1]%/sqrt(2);
 fprintf(fid, 'forming BH..................\n');
 UHadamard = 1;
-for j = 1: k
+for j = 1: l
     UHadamard = kron(UHadamard, Hadamard);
 end
 BH = kron(UHadamard, eye(N));
 fprintf(fid, 'forming VH..................\n');
 VH = zeros(N^2/2);
 %     H1 = H;
-for j = 0:K-1
+for j = 0:L-1
     [Pj, Vj] = getPjVj(H,j);
     j2 = N*j;
     VH(j2+1:j2+N, j2+1:j2+N) = Vj*Pj;
@@ -41,22 +41,22 @@ end
 % % % % % % % % % % % % % % % % % %
 
 %     circuit U(t) requires two additional qubit.
-% the total system size is 2n+1
-qtotal = 2*n+1;
-N2 = N^2;
+% the total system size is 2n+1 or l+n+2
+qtotal = l+n+2;
+LN = L*N;
 Ntotal = 2^qtotal;
-IN2 = eye(N2);
-C0UH = kron(I,blkdiag(UH, 1i*eye(N2/2))); %operates when 2nd qubit is 0
-C1UH = blkdiag(eye(N2), kron(I,UH));%operates when 1st qubit is 1
 
-Pi = blkdiag(eye(N), kron(X, eye((N2-2*N)/2)),eye(N));
-CPi = blkdiag(eye(N2),Pi);
+C0UH = kron(I,blkdiag(UH, 1i*eye(LN))); %operates when 2nd qubit is 0
+C1UH = blkdiag(eye(2*LN), kron(I,UH));%operates when 1st qubit is 1
+
+Pi = blkdiag(eye(N), kron(X, eye(L*N-N)),eye(N));
+CPi = blkdiag(eye(2*LN),Pi);
 V = C1UH*CPi*C0UH;
 
-cf = sqrt([t, 1,t^2/2,0])';
+cf = sqrt([t,1,t^2/2,0])';
 ncf = norm(cf);
 cf = cf/ncf;
-B = mykron(householderMatrix(cf), eye(Ntotal/4));
+B = kron(householderMatrix(cf), eye(Ntotal/4));
 Ut = B'*V*B;
 Utexpected = (t*H + t^2*H^2/2 + 1i*eye(N))/ncf^2;
 if(norm(Ut(1:N,1:N)-Utexpected) > threshold)
@@ -64,4 +64,3 @@ if(norm(Ut(1:N,1:N)-Utexpected) > threshold)
 else
     fprintf('Ut is succesfully formed\n');
 end
-
